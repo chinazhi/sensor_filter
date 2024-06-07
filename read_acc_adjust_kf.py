@@ -8,9 +8,58 @@ from filter import OneDimKalmanFilter
 # 计算速度（加速度的积分）
 def calculate_velocity(acceleration, times):
     velocity = [0]  # 初始速度假设为0
+    acc = 0
+    consecutive_count = 0
+    last_state = 0
+    now_state = 0
+    last_velocity = 0
+    now_velocity = 0
+    consecutive_v_count = 0
+    consecutive_s_count = 0
+    consecutive_d_count = 0
     for i in range(1, len(acceleration)):
+        acc = acceleration[i]
+        if abs(acc) < 6:
+            consecutive_count += 1
+            if consecutive_count >= 5:
+                acc = 0
+        else:
+            consecutive_count = 0    
+
         dt = (times[i] - times[i - 1]).total_seconds()  # 时间差，以秒为单位
-        velocity.append(velocity[-1] + acceleration[i] * dt)
+        now_velocity = velocity[-1] + acc * dt
+        
+        abs_now_velocity = abs(now_velocity)
+        abs_last_velocity = abs(velocity[-1])
+
+        if (abs_now_velocity - abs_last_velocity) > 3:
+            consecutive_d_count = 0
+            consecutive_v_count += 1
+            if consecutive_v_count >= 5 and now_state != 1:
+                last_state = now_state
+                now_state = 1
+                print('change state from 0 to 1')
+        elif (abs_now_velocity - abs_last_velocity) < -3:
+            consecutive_d_count = 0
+            consecutive_s_count += 1
+            if consecutive_s_count >= 5 and now_state != -1:
+                last_state = now_state
+                now_state = -1
+                print('change state from 0 to -1')
+        else:
+            consecutive_v_count = 0
+            consecutive_s_count = 0
+            consecutive_d_count +=1
+            if consecutive_d_count >= 8 and now_state != 0:
+                last_state = now_state
+                now_state = 0
+                print('change state 0')
+
+        if last_state == -1 and now_state == 0 and acc == 0:
+            now_velocity = 0
+            print('reset velocity to 0')
+
+        velocity.append(now_velocity)
     return velocity
 
 # 读取文件并提取数据
@@ -33,7 +82,7 @@ static_acceleration_mean = np.mean(z_values[:-10])
 z_values_corrected = np.array(z_values) - static_acceleration_mean
 
 # 初始参数设置
-initial_process_variance = 0.177
+initial_process_variance = 0.0841
 initial_measurement_variance = 4.2
 initial_estimated_error = 1
 initial_value = z_values_corrected[0]
